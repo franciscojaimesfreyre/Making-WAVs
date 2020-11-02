@@ -6,7 +6,13 @@ const path = require('path');
 const d3nLine = require('d3node-linechart');
 const output = require('d3node-output');
 
-const file = fs.readFileSync(path.join(__dirname, './file_example.wav'));
+const maxValues = {
+  BIT8: 128,
+  BIT16: 32768,
+  BIT32: 2147483648
+};
+
+const file = fs.readFileSync(path.join(__dirname, './testbed/audioCheck2.wav'));
 
 const riffChunkSize = B.u32LE.chain(size => {
   if (size !== file.length - 8) {
@@ -56,23 +62,6 @@ const fmtSubChunk = A.coroutine(function* () {
   return fmtChunkData;
 });
 
-// const factSubChunk = A.coroutine(function* () {
-//   const empty1 = yield A.anyChar;
-//   const empty2 = yield A.anyChar;
-//   const id = yield A.str('fact');
-//   const subChunkSize = yield B.u32LE;
-//   const audioFormat = yield B.u32LE;
-
-//   const factChunkData = {
-//     id,
-//     subChunkSize,
-//     audioFormat
-//   };
-//   return factChunkData;
-// });
-
-
-
 const dataSubChunk = A.coroutine(function* () {
   const id = yield A.str('data');
   const size = yield B.u32LE;
@@ -110,8 +99,7 @@ const dataSubChunk = A.coroutine(function* () {
 const parser = A.sequenceOf([
   riffChunk,
   fmtSubChunk,
-  dataSubChunk,
-  //A.endOfInput
+  dataSubChunk
 ]).map(([riffChunk, fmtSubChunk,dataSubChunk]) => ({
   riffChunk,
   fmtSubChunk,
@@ -123,32 +111,42 @@ if (myOutput.isError) {
   console.log(myOutput.error);
   throw new Error(myOutput.error);
 }
-console.log(myOutput.result.dataSubChunk.channelData);
+const BITS_PER_SAMPLE = myOutput.data.bitsPerSample;
+const MAX_VALUE = BITS_PER_SAMPLE == 8? maxValues.BIT8 : BITS_PER_SAMPLE == 16? maxValues.BIT16 : maxValues.BIT32;
+const channelsData = myOutput.result.dataSubChunk.channelData;
+
+console.log("DBs: ",calculateRMSDbs(channelsData));
+drawLineChart(peakNormalize(stereoToMonoAvg(channelsData)));
 
 
-const dataArray = peakNormalize(myOutput.result.dataSubChunk.channelData[0],32768);
-// const dataArray = myOutput.result.dataSubChunk.channelData[0];
-
-//TODO: calculate for each channel and sum them up(?)
-console.log("DBs: ",calculateRMSDbs(dataArray));
-drawLineChart(dataArray);
-
-
-function calculateRMSDbs(dataArray) {
+function calculateRMSDbs(channelsData) {
+  const data = stereoToMonoAvg(channelsData);
+  const normalizedData = peakNormalize(data);
   let sum = 0;
-  dataArray.forEach(value => {
-    let sample = value / 32768;
+  normalizedData.forEach(value => {
+    let sample = value / MAX_VALUE;
     sum += (sample * sample);
   });
-  const rms = Math.sqrt(sum / (dataArray.length / 2));
+  const rms = Math.sqrt(sum / (normalizedData.length / 2));
   const db = 20 * Math.log10(rms);
   return db;
 }
 
+function stereoToMonoAvg(channelsData) {
+  const left = channelsData[0];
+  const right = channelsData[1];
+  if (!right) return left;
+  const monoData = [];
+  for(let i = 0; i < left.length; i++) {
+    monoData.push((left[i]+right[i])/2);
+  }
+  return monoData;
+}
+
 function drawLineChart(dataArray) {
-  const data = dataArray.map((value, index) => { return { key: index, value: value / 32768 }; });
+  const data = dataArray.map((value, index) => { return { key: index, value: value / MAX_VALUE }; });
   const line = d3nLine({ data: data });
-  output('./examples/output', line, { width: 960, height: 550 });
+  output('./charts/output', line, { width: 960, height: 550 });
 }
 
 function peak(audioChannelData) {
@@ -160,8 +158,8 @@ function peak(audioChannelData) {
   return max;
 }
 
-function peakNormalize(audioChannelData, myCeroDb) {
+function peakNormalize(audioChannelData) {
   const mypeak = peak(audioChannelData);
-  const factor = myCeroDb / mypeak;
+  const factor = MAX_VALUE / mypeak;
   return audioChannelData.map(value => value * factor);
 }
