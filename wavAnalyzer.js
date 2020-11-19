@@ -21,7 +21,7 @@ function calculateRMSDbsFromAWavPath(aWavFilePath) {
     let sample = value / maxValue;
     sum += (sample * sample);
   });
-  const rms = Math.sqrt(sum / (normalizedData.length / 2));
+  const rms = Math.sqrt(sum / normalizedData.length);
   const db = 20 * Math.log10(rms);
   return db;
 }

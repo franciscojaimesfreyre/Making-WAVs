@@ -25,8 +25,8 @@ async function overFilesInFolderDo(folderPath, someFunction) {
   return fileNames.map((fileName) => someFunction(`${folderPath}/${fileName}`));
 }
 
-const program = async () => {
-  const dbRows = await overFilesInFolderDo('./testbed', returnDbRows);
+const program = async (wavFilesFolerPath) => {
+  const dbRows = await overFilesInFolderDo(wavFilesFolerPath, returnDbRows);
   console.log(dbRows);
 
   let json2csvCallback = function (err, csv) {
@@ -44,6 +44,6 @@ const program = async () => {
   prependHeader: true
   });
 }
-program();
+program('./testbed');
 
 
