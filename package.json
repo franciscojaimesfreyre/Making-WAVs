@@ -14,6 +14,7 @@
     "arcsecond-binary": "^2.0.0",
     "construct-js": "^0.7.0",
     "d3node-linechart": "^0.1.2",
-    "d3node-output": "^1.0.3"
+    "d3node-output": "^1.0.3",
+    "json-2-csv": "^3.7.8"
   }
 }
